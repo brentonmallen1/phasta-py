@@ -1,0 +1,39 @@
+# Core scientific computing
+numpy>=2.0.0
+scipy>=1.12.0
+pandas>=2.2.0
+
+# Parallel computing
+mpi4py>=3.1.4
+h5py>=3.10.0
+netCDF4>=1.6.5
+
+# GPU acceleration
+pycuda>=2024.1.0
+pyopencl>=2024.1.0
+metal-python>=0.2.0
+
+# Visualization and plotting
+matplotlib>=3.8.0
+pyvista>=0.43.0
+vtk>=9.3.0
+
+# Testing and development
+pytest>=8.0.0
+pytest-mpi>=0.7.0
+pytest-cov>=4.1.0
+black>=24.1.0
+ruff>=0.2.0
+pyright>=1.1.0
+
+# Documentation
+sphinx>=7.2.0
+sphinx-rtd-theme>=2.0.0
+nbsphinx>=0.9.0
+
+# Optional dependencies
+# Uncomment if needed:
+# petsc4py>=3.20.0
+# slepc4py>=3.20.0
+# fenics>=2024.1.0
+# dolfin>=2024.1.0
