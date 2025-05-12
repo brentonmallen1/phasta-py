@@ -8,6 +8,18 @@ from phasta.fem.solvers import (
     LinearSolver, DirectSolver, GMRESSolver,
     ConjugateGradientSolver, BiCGSTABSolver, SolverFactory
 )
+from phasta.solvers.direct import (
+    LUSolver,
+    CholeskySolver,
+    SparseDirectSolver,
+    BlockDirectSolver,
+    solve_direct
+)
+from phasta.solvers.multigrid import (
+    MultiGridSolver,
+    GeometricMultiGrid,
+    AlgebraicMultiGrid
+)
 
 
 def create_test_system(n: int = 100) -> Tuple[sparse.spmatrix, np.ndarray]:
@@ -160,4 +172,237 @@ def test_non_symmetric_system():
     # Test CG (should fail for non-symmetric system)
     solver = ConjugateGradientSolver(max_iter=100, tol=1e-8)
     with pytest.raises(np.linalg.LinAlgError):
-        solver.solve(A, b) 
+        solver.solve(A, b)
+
+
+def test_lu_solver():
+    """Test LU decomposition solver."""
+    # Create test matrix and vector
+    A = np.array([
+        [4, 1, 1],
+        [1, 3, 2],
+        [1, 2, 5]
+    ])
+    b = np.array([1, 2, 3])
+    
+    # Create solver
+    solver = LUSolver(A)
+    
+    # Solve system
+    x = solver.solve(b)
+    
+    # Check solution
+    assert np.allclose(A @ x, b)
+    
+    # Test with sparse matrix
+    A_sparse = sparse.csr_matrix(A)
+    solver_sparse = LUSolver(A_sparse)
+    x_sparse = solver_sparse.solve(b)
+    assert np.allclose(x, x_sparse)
+
+
+def test_cholesky_solver():
+    """Test Cholesky decomposition solver."""
+    # Create symmetric positive definite matrix
+    A = np.array([
+        [4, 1, 1],
+        [1, 3, 2],
+        [1, 2, 5]
+    ])
+    A = A.T @ A  # Make it positive definite
+    b = np.array([1, 2, 3])
+    
+    # Create solver
+    solver = CholeskySolver(A)
+    
+    # Solve system
+    x = solver.solve(b)
+    
+    # Check solution
+    assert np.allclose(A @ x, b)
+    
+    # Test with sparse matrix
+    A_sparse = sparse.csr_matrix(A)
+    solver_sparse = CholeskySolver(A_sparse)
+    x_sparse = solver_sparse.solve(b)
+    assert np.allclose(x, x_sparse)
+
+
+def test_sparse_direct_solver():
+    """Test sparse direct solver."""
+    # Create sparse matrix
+    A = sparse.csr_matrix([
+        [4, 1, 0],
+        [1, 3, 2],
+        [0, 2, 5]
+    ])
+    b = np.array([1, 2, 3])
+    
+    # Test different methods
+    methods = ['umfpack', 'superlu']
+    for method in methods:
+        solver = SparseDirectSolver(A, method=method)
+        x = solver.solve(b)
+        assert np.allclose(A @ x, b)
+    
+    # Test fallback for pardiso
+    solver = SparseDirectSolver(A, method='pardiso')
+    x = solver.solve(b)
+    assert np.allclose(A @ x, b)
+
+
+def test_block_direct_solver():
+    """Test block direct solver."""
+    # Create block matrices
+    blocks = [
+        np.array([[4, 1], [1, 3]]),
+        np.array([[5, 2], [2, 6]])
+    ]
+    b = np.array([1, 2, 3, 4])
+    
+    # Create solver
+    solver = BlockDirectSolver(blocks)
+    
+    # Solve system
+    x = solver.solve(b)
+    
+    # Check solution
+    A = sparse.block_diag(blocks)
+    assert np.allclose(A @ x, b)
+
+
+def test_solve_direct():
+    """Test convenience function for direct solution."""
+    # Create test matrices
+    A_dense = np.array([
+        [4, 1, 1],
+        [1, 3, 2],
+        [1, 2, 5]
+    ])
+    A_sparse = sparse.csr_matrix(A_dense)
+    b = np.array([1, 2, 3])
+    
+    # Test different methods
+    methods = ['auto', 'lu', 'cholesky', 'sparse']
+    for method in methods:
+        x = solve_direct(A_dense, b, method=method)
+        assert np.allclose(A_dense @ x, b)
+    
+    # Test with sparse matrix
+    x = solve_direct(A_sparse, b)
+    assert np.allclose(A_sparse @ x, b)
+
+
+def test_geometric_multigrid():
+    """Test geometric multi-grid solver."""
+    # Create grid hierarchy
+    nodes_fine = np.array([
+        [0, 0], [1, 0], [0, 1], [1, 1],
+        [0.5, 0], [0, 0.5], [0.5, 1], [1, 0.5], [0.5, 0.5]
+    ])
+    nodes_coarse = np.array([
+        [0, 0], [1, 0], [0, 1], [1, 1]
+    ])
+    elements_fine = np.array([
+        [0, 4, 5], [4, 1, 8], [5, 8, 2], [8, 7, 2],
+        [1, 7, 8], [7, 3, 8], [8, 3, 6], [6, 2, 8]
+    ])
+    elements_coarse = np.array([
+        [0, 1, 2], [1, 3, 2]
+    ])
+    
+    # Create system matrix
+    A = sparse.csr_matrix((9, 9))
+    A[0, 0] = 4
+    A[1, 1] = 4
+    A[2, 2] = 4
+    A[3, 3] = 4
+    A[4, 4] = 4
+    A[5, 5] = 4
+    A[6, 6] = 4
+    A[7, 7] = 4
+    A[8, 8] = 4
+    
+    # Create solver
+    solver = GeometricMultiGrid(
+        A,
+        grid_hierarchy=[(nodes_fine, elements_fine), (nodes_coarse, elements_coarse)],
+        max_levels=2,
+        smoother='jacobi',
+        n_smooth=2
+    )
+    
+    # Solve system
+    b = np.ones(9)
+    x = solver.solve(b)
+    
+    # Check solution
+    assert np.allclose(A @ x, b, atol=1e-6)
+
+
+def test_algebraic_multigrid():
+    """Test algebraic multi-grid solver."""
+    # Create sparse matrix
+    A = sparse.csr_matrix([
+        [4, 1, 0, 1],
+        [1, 3, 2, 0],
+        [0, 2, 5, 1],
+        [1, 0, 1, 4]
+    ])
+    b = np.array([1, 2, 3, 4])
+    
+    # Create solver
+    solver = AlgebraicMultiGrid(
+        A,
+        max_levels=2,
+        smoother='jacobi',
+        n_smooth=2,
+        strength_threshold=0.25
+    )
+    
+    # Solve system
+    x = solver.solve(b)
+    
+    # Check solution
+    assert np.allclose(A @ x, b, atol=1e-6)
+
+
+def test_multigrid_smoothers():
+    """Test multi-grid smoothers."""
+    # Create test matrix
+    A = sparse.csr_matrix([
+        [4, 1, 0],
+        [1, 3, 2],
+        [0, 2, 5]
+    ])
+    b = np.array([1, 2, 3])
+    x0 = np.zeros_like(b)
+    
+    # Test different smoothers
+    smoothers = ['jacobi', 'gauss_seidel', 'sor']
+    for smoother in smoothers:
+        solver = GeometricMultiGrid(
+            A,
+            grid_hierarchy=[(np.array([[0, 0], [1, 0], [0, 1]]),
+                           np.array([[0, 1, 2]]))],
+            smoother=smoother,
+            n_smooth=2
+        )
+        x = solver.solve(b, x0=x0)
+        assert np.allclose(A @ x, b, atol=1e-6)
+
+
+def test_invalid_inputs():
+    """Test handling of invalid inputs."""
+    # Test invalid smoother
+    A = sparse.csr_matrix([[4, 1], [1, 3]])
+    with pytest.raises(ValueError):
+        MultiGridSolver(A, smoother='invalid')
+    
+    # Test invalid method
+    with pytest.raises(ValueError):
+        SparseDirectSolver(A, method='invalid')
+    
+    # Test invalid solve_direct method
+    with pytest.raises(ValueError):
+        solve_direct(A, np.array([1, 2]), method='invalid') 

@@ -1,145 +1,238 @@
-"""Tests for preconditioners module."""
+"""Tests for advanced preconditioners."""
 
 import numpy as np
 import pytest
-from scipy import sparse
-from phasta.fem.preconditioners import (
-    Preconditioner, DiagonalPreconditioner, ILUPreconditioner,
-    BlockJacobiPreconditioner, AMGPreconditioner, PreconditionerFactory
+from scipy.sparse import csr_matrix, spdiags
+from phasta.solver.preconditioners import (
+    Preconditioner, AMGPreconditioner, ILUPreconditioner, BlockPreconditioner
 )
 
 
-def create_test_system(n: int = 100) -> sparse.spmatrix:
-    """Create a test system matrix.
-    
-    Args:
-        n: System size
-        
-    Returns:
-        System matrix
-    """
-    # Create a symmetric positive definite matrix
-    A = sparse.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n))
-    return A
-
-
-def test_diagonal_preconditioner():
-    """Test diagonal preconditioner."""
-    # Create test system
-    A = create_test_system()
+def test_amg_preconditioner():
+    """Test algebraic multigrid preconditioner."""
+    # Create test matrix (Laplacian)
+    n = 100
+    A = spdiags([-1, 2, -1], [-1, 0, 1], n, n).tocsr()
     
     # Create preconditioner
-    precond = DiagonalPreconditioner()
-    precond.setup(A)
+    preconditioner = AMGPreconditioner(
+        max_levels=5,
+        coarsening_type='RS',
+        interpolation_type='classical',
+        smoother_type='jacobi',
+        smoothing_steps=2
+    )
+    
+    # Setup preconditioner
+    preconditioner.setup(A)
     
     # Test preconditioner
-    x = np.ones(A.shape[0])
-    y = precond.apply(x)
+    b = np.ones(n)
+    x = preconditioner.apply(b)
     
-    # Check result
-    assert y.shape == x.shape
-    assert not np.allclose(y, x)  # Should modify the vector
-    assert np.all(np.isfinite(y))  # Should be finite
+    # Check solution
+    assert len(x) == n
+    assert np.all(np.isfinite(x))
+    
+    # Test different coarsening types
+    for coarsening_type in ['RS', 'PMIS', 'HMIS']:
+        preconditioner = AMGPreconditioner(coarsening_type=coarsening_type)
+        preconditioner.setup(A)
+        x = preconditioner.apply(b)
+        assert len(x) == n
+        assert np.all(np.isfinite(x))
+    
+    # Test different smoothers
+    for smoother_type in ['jacobi', 'gauss_seidel', 'ilu']:
+        preconditioner = AMGPreconditioner(smoother_type=smoother_type)
+        preconditioner.setup(A)
+        x = preconditioner.apply(b)
+        assert len(x) == n
+        assert np.all(np.isfinite(x))
 
 
 def test_ilu_preconditioner():
-    """Test ILU preconditioner."""
-    # Create test system
-    A = create_test_system()
+    """Test incomplete LU preconditioner."""
+    # Create test matrix
+    n = 100
+    A = spdiags([-1, 2, -1], [-1, 0, 1], n, n).tocsr()
     
     # Create preconditioner
-    precond = ILUPreconditioner(fill_factor=5.0, drop_tol=1e-4)
-    precond.setup(A)
+    preconditioner = ILUPreconditioner(
+        fill_factor=10,
+        drop_tol=1e-4
+    )
+    
+    # Setup preconditioner
+    preconditioner.setup(A)
     
     # Test preconditioner
-    x = np.ones(A.shape[0])
-    y = precond.apply(x)
+    b = np.ones(n)
+    x = preconditioner.apply(b)
     
-    # Check result
-    assert y.shape == x.shape
-    assert not np.allclose(y, x)  # Should modify the vector
-    assert np.all(np.isfinite(y))  # Should be finite
+    # Check solution
+    assert len(x) == n
+    assert np.all(np.isfinite(x))
+    
+    # Test different fill factors
+    for fill_factor in [5, 10, 20]:
+        preconditioner = ILUPreconditioner(fill_factor=fill_factor)
+        preconditioner.setup(A)
+        x = preconditioner.apply(b)
+        assert len(x) == n
+        assert np.all(np.isfinite(x))
+    
+    # Test different drop tolerances
+    for drop_tol in [1e-3, 1e-4, 1e-5]:
+        preconditioner = ILUPreconditioner(drop_tol=drop_tol)
+        preconditioner.setup(A)
+        x = preconditioner.apply(b)
+        assert len(x) == n
+        assert np.all(np.isfinite(x))
 
 
-def test_block_jacobi_preconditioner():
-    """Test block Jacobi preconditioner."""
-    # Create test system
-    A = create_test_system()
+def test_block_preconditioner():
+    """Test block preconditioner."""
+    # Create test matrix
+    n = 100
+    block_size = 10
+    A = spdiags([-1, 2, -1], [-1, 0, 1], n, n).tocsr()
     
     # Create preconditioner
-    precond = BlockJacobiPreconditioner(block_size=4)
-    precond.setup(A)
+    preconditioner = BlockPreconditioner(
+        block_size=block_size,
+        preconditioner_type='ilu'
+    )
+    
+    # Setup preconditioner
+    preconditioner.setup(A)
     
     # Test preconditioner
-    x = np.ones(A.shape[0])
-    y = precond.apply(x)
+    b = np.ones(n)
+    x = preconditioner.apply(b)
     
-    # Check result
-    assert y.shape == x.shape
-    assert not np.allclose(y, x)  # Should modify the vector
-    assert np.all(np.isfinite(y))  # Should be finite
+    # Check solution
+    assert len(x) == n
+    assert np.all(np.isfinite(x))
+    
+    # Test different block sizes
+    for block_size in [5, 10, 20]:
+        preconditioner = BlockPreconditioner(block_size=block_size)
+        preconditioner.setup(A)
+        x = preconditioner.apply(b)
+        assert len(x) == n
+        assert np.all(np.isfinite(x))
+    
+    # Test different preconditioner types
+    for preconditioner_type in ['ilu', 'amg']:
+        preconditioner = BlockPreconditioner(
+            block_size=block_size,
+            preconditioner_type=preconditioner_type
+        )
+        preconditioner.setup(A)
+        x = preconditioner.apply(b)
+        assert len(x) == n
+        assert np.all(np.isfinite(x))
 
 
-def test_amg_preconditioner():
-    """Test AMG preconditioner."""
-    # Create test system
-    A = create_test_system()
+def test_edge_cases():
+    """Test edge cases and error handling."""
+    # Test zero matrix
+    n = 10
+    A = csr_matrix((n, n))
     
-    # Create preconditioner
-    precond = AMGPreconditioner(strength=0.25, max_levels=2)
-    precond.setup(A)
-    
-    # Test preconditioner
-    x = np.ones(A.shape[0])
-    y = precond.apply(x)
-    
-    # Check result
-    assert y.shape == x.shape
-    assert not np.allclose(y, x)  # Should modify the vector
-    assert np.all(np.isfinite(y))  # Should be finite
-
-
-def test_preconditioner_factory():
-    """Test preconditioner factory."""
-    # Create test system
-    A = create_test_system()
-    
-    # Test creating different preconditioners
-    precond_types = ['diagonal', 'ilu', 'block_jacobi', 'amg']
-    for precond_type in precond_types:
-        precond = PreconditionerFactory.create_preconditioner(precond_type)
-        precond.setup(A)
-        x = np.ones(A.shape[0])
-        y = precond.apply(x)
-        assert y.shape == x.shape
-        assert np.all(np.isfinite(y))
-    
-    # Test invalid preconditioner type
+    # AMG preconditioner
+    preconditioner = AMGPreconditioner()
     with pytest.raises(ValueError):
-        PreconditionerFactory.create_preconditioner('invalid')
+        preconditioner.setup(A)
+    
+    # ILU preconditioner
+    preconditioner = ILUPreconditioner()
+    with pytest.raises(ValueError):
+        preconditioner.setup(A)
+    
+    # Block preconditioner
+    preconditioner = BlockPreconditioner(block_size=2)
+    with pytest.raises(ValueError):
+        preconditioner.setup(A)
+    
+    # Test singular matrix
+    A = csr_matrix((n, n))
+    A[0, 0] = 1.0
+    
+    # AMG preconditioner
+    preconditioner = AMGPreconditioner()
+    preconditioner.setup(A)
+    b = np.ones(n)
+    x = preconditioner.apply(b)
+    assert np.all(np.isfinite(x))
+    
+    # ILU preconditioner
+    preconditioner = ILUPreconditioner()
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    assert np.all(np.isfinite(x))
+    
+    # Block preconditioner
+    preconditioner = BlockPreconditioner(block_size=2)
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    assert np.all(np.isfinite(x))
 
 
-def test_preconditioner_effectiveness():
-    """Test effectiveness of preconditioners."""
-    # Create test system
-    A = create_test_system(n=200)
-    b = np.ones(A.shape[0])
+def test_memory_management():
+    """Test memory management during preconditioner setup."""
+    # Create large matrix
+    n = 1000
+    A = spdiags([-1, 2, -1], [-1, 0, 1], n, n).tocsr()
+    b = np.ones(n)
     
-    # Solve without preconditioner
-    x0, info0 = sparse.linalg.gmres(A, b, maxiter=100, tol=1e-8)
-    iterations0 = info0
+    # Test AMG preconditioner
+    preconditioner = AMGPreconditioner()
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    assert len(x) == n
+    assert np.all(np.isfinite(x))
     
-    # Test each preconditioner
-    precond_types = ['diagonal', 'ilu', 'block_jacobi', 'amg']
-    for precond_type in precond_types:
-        precond = PreconditionerFactory.create_preconditioner(precond_type)
-        precond.setup(A)
-        
-        # Solve with preconditioner
-        x1, info1 = sparse.linalg.gmres(A, b, M=precond.apply,
-                                      maxiter=100, tol=1e-8)
-        iterations1 = info1
-        
-        # Check that preconditioner helps
-        assert iterations1 <= iterations0
-        assert np.allclose(A @ x1, b, rtol=1e-8) 
+    # Test ILU preconditioner
+    preconditioner = ILUPreconditioner()
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    assert len(x) == n
+    assert np.all(np.isfinite(x))
+    
+    # Test block preconditioner
+    preconditioner = BlockPreconditioner(block_size=100)
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    assert len(x) == n
+    assert np.all(np.isfinite(x))
+
+
+def test_convergence():
+    """Test preconditioner convergence."""
+    # Create test matrix
+    n = 100
+    A = spdiags([-1, 2, -1], [-1, 0, 1], n, n).tocsr()
+    b = np.ones(n)
+    
+    # Test AMG preconditioner
+    preconditioner = AMGPreconditioner()
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    residual = np.linalg.norm(b - A @ x)
+    assert residual < 1e-6
+    
+    # Test ILU preconditioner
+    preconditioner = ILUPreconditioner()
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    residual = np.linalg.norm(b - A @ x)
+    assert residual < 1e-6
+    
+    # Test block preconditioner
+    preconditioner = BlockPreconditioner(block_size=10)
+    preconditioner.setup(A)
+    x = preconditioner.apply(b)
+    residual = np.linalg.norm(b - A @ x)
+    assert residual < 1e-6 
