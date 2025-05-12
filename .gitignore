@@ -1,7 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 *.so
 .Python
 build/
@@ -20,15 +20,115 @@ wheels/
 .installed.cfg
 *.egg
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Virtual Environment
+venv/
+env/
+ENV/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+.project
+.pydevproject
+.settings/
 
-# OS
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation
+docs/_build/
+docs/api/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+log/
+
+# Local development
+.env
+.env.local
+.env.*.local
+
+# OS specific
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+
+# Project specific
+*.vtk
+*.vtu
+*.pvtu
+*.h5
+*.hdf5
+*.nc
+*.netcdf
+*.dat
+*.out
+*.err
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# GPU specific
+*.cubin
+*.ptx
+*.fatbin
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+
+# MPI specific
+*.mpi
+*.mpi.*
+*.mpi_*
+*.mpi-*
+*.mpi_rank_*
+*.mpi_size_*
+*.mpi_comm_*
+*.mpi_group_*
+*.mpi_info_*
+*.mpi_status_*
+*.mpi_request_*
+*.mpi_op_*
+*.mpi_datatype_*
+*.mpi_errhandler_*
+*.mpi_win_*
+*.mpi_file_*
+*.mpi_io_*
+*.mpi_io_handle_*
+*.mpi_io_request_*
+*.mpi_io_status_*
+*.mpi_io_info_*
+*.mpi_io_file_*
+*.mpi_io_group_*
+*.mpi_io_comm_*
+*.mpi_io_datatype_*
+*.mpi_io_op_*
+*.mpi_io_errhandler_*
+*.mpi_io_win_*
